@@ -38,6 +38,10 @@
 #ifndef __ZMQ_H_INCLUDED__
 #define __ZMQ_H_INCLUDED__
 
+// This is a gypsyfix to prevent including this library everywhere
+// where GodSpeed is used
+#pragma comment(lib, "iphlpapi.lib")
+
 /*  Version macros for compile-time API version detection                     */
 #define ZMQ_VERSION_MAJOR 4
 #define ZMQ_VERSION_MINOR 2
