@@ -22,6 +22,15 @@
 #ifndef __ZMQ_HPP_INCLUDED__
 #define __ZMQ_HPP_INCLUDED__
 
+/*  STINGRAY COMPATIBILITY FIXES */
+#define ZMQ_STATIC
+
+// This is a gypsyfix to prevent including this library everywhere
+// where GodSpeed is used
+#pragma comment(lib, "iphlpapi.lib")
+
+
+
 #if __cplusplus >= 201103L
 #define ZMQ_CPP11
 #define ZMQ_NOTHROW noexcept
