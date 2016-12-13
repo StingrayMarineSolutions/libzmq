@@ -45,7 +45,7 @@
 /*  Version macros for compile-time API version detection                     */
 #define ZMQ_VERSION_MAJOR 4
 #define ZMQ_VERSION_MINOR 2
-#define ZMQ_VERSION_PATCH 0
+#define ZMQ_VERSION_PATCH 1
 
 #define ZMQ_MAKE_VERSION(major, minor, patch) \
     ((major) * 10000 + (minor) * 100 + (patch))
@@ -114,6 +114,13 @@ extern "C" {
 #   endif
 #else
 #   include <stdint.h>
+#endif
+
+//  32-bit AIX's pollfd struct members are called reqevents and rtnevents so it
+//  defines compatibility macros for them. Need to include that header first to
+//  stop build failures since zmq_pollset_t defines them as events and revents.
+#ifdef ZMQ_HAVE_AIX
+    #include <poll.h>
 #endif
 
 
@@ -210,6 +217,9 @@ ZMQ_EXPORT void zmq_version (int *major, int *minor, int *patch);
 #define ZMQ_THREAD_PRIORITY 3
 #define ZMQ_THREAD_SCHED_POLICY 4
 #define ZMQ_MAX_MSGSZ 5
+//  All options after this is for version 4.3 and still *draft*
+//  Subject to arbitrary change without notice
+#define ZMQ_MSG_T_SIZE 6
 
 /*  Default for new contexts                                                  */
 #define ZMQ_IO_THREADS_DFLT  1
@@ -233,10 +243,23 @@ ZMQ_EXPORT int zmq_ctx_destroy (void *context);
 /*  0MQ message definition.                                                   */
 /******************************************************************************/
 
-/* union here ensures correct alignment on architectures that require it, e.g.
- * SPARC
+/* Some architectures, like sparc64 and some variants of aarch64, enforce pointer
+ * alignment and raise sigbus on violations. Make sure applications allocate
+ * zmq_msg_t on addresses aligned on a pointer-size boundary to avoid this issue.
  */
-typedef union zmq_msg_t {unsigned char _ [64]; void *p; } zmq_msg_t;
+typedef struct zmq_msg_t {
+#if defined (__GNUC__) || defined ( __INTEL_COMPILER) || \
+        (defined (__SUNPRO_C) && __SUNPRO_C >= 0x590) || \
+        (defined (__SUNPRO_CC) && __SUNPRO_CC >= 0x590)
+    unsigned char _ [64] __attribute__ ((aligned (sizeof (void *))));
+#elif defined (_MSC_VER) && (defined (_M_X64) || defined (_M_ARM64))
+    __declspec (align (8)) unsigned char _ [64];
+#elif defined (_MSC_VER) && (defined (_M_IX86) || defined (_M_ARM_ARMV7VE))
+    __declspec (align (4)) unsigned char _ [64];
+#else
+    unsigned char _ [64];
+#endif
+} zmq_msg_t;
 
 typedef void (zmq_free_fn) (void *data, void *hint);
 
@@ -334,8 +357,6 @@ ZMQ_EXPORT const char *zmq_msg_gets (zmq_msg_t *msg, const char *property);
 #define ZMQ_HANDSHAKE_IVL 66
 #define ZMQ_SOCKS_PROXY 68
 #define ZMQ_XPUB_NODROP 69
-//  All options after this is for version 4.2 and still *draft*
-//  Subject to arbitrary change without notice
 #define ZMQ_BLOCKY 70
 #define ZMQ_XPUB_MANUAL 71
 #define ZMQ_XPUB_WELCOME_MSG 72
@@ -354,6 +375,8 @@ ZMQ_EXPORT const char *zmq_msg_gets (zmq_msg_t *msg, const char *property);
 #define ZMQ_VMCI_BUFFER_MAX_SIZE 87
 #define ZMQ_VMCI_CONNECT_TIMEOUT 88
 #define ZMQ_USE_FD 89
+//  All options after this is for version 4.3 and still *draft*
+//  Subject to arbitrary change without notice
 
 /*  Message options                                                           */
 #define ZMQ_MORE 1
@@ -581,6 +604,7 @@ ZMQ_EXPORT int  zmq_poller_add (void *poller, void *socket, void *user_data, sho
 ZMQ_EXPORT int  zmq_poller_modify (void *poller, void *socket, short events);
 ZMQ_EXPORT int  zmq_poller_remove (void *poller, void *socket);
 ZMQ_EXPORT int  zmq_poller_wait (void *poller, zmq_poller_event_t *event, long timeout);
+ZMQ_EXPORT int  zmq_poller_wait_all (void *poller, zmq_poller_event_t *events, int n_events, long timeout);
 
 #if defined _WIN32
 ZMQ_EXPORT int zmq_poller_add_fd (void *poller, SOCKET fd, void *user_data, short events);

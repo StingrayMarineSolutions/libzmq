@@ -37,9 +37,10 @@ AC_SUBST(PACKAGE_VERSION)
 # ZeroMQ version 3.1: 3:0:0 (ABI version 3)
 # ZeroMQ version 4.0: 4:0:0 (ABI version 4)
 # ZeroMQ version 4.1: 5:0:0 (ABI version 5)
+# ZeroMQ version 4.2.0: 6:0:1 (ABI version 5)
 #
 # libzmq -version-info current:revision:age
-LTVER="5:0:0"
+LTVER="6:0:1"
 AC_SUBST(LTVER)
 
 # Take a copy of original flags
@@ -140,6 +141,9 @@ libzmq_on_gnu="no"
 # Set some default features required by ZeroMQ code
 CPPFLAGS="-D_REENTRANT -D_THREAD_SAFE -Wno-long-long $CPPFLAGS"
 
+# Will be used to add flags to pkg-config useful when apps want to statically link
+PKGCFG_LIBS_PRIVATE=""
+
 # For host type checks
 AC_CANONICAL_HOST
 
@@ -152,6 +156,11 @@ case "${host_os}" in
         fi
         AC_DEFINE(ZMQ_HAVE_LINUX, 1, [Have Linux OS])
         libzmq_on_linux="yes"
+
+        # dladdr/dlopen is in libdl on glibc
+        AC_SEARCH_LIBS([dladdr], [dl dld], [], [
+          AC_MSG_ERROR([unable to find the dladdr() function])
+        ])
 
         if test "x$libzmq_tipc_support" = "xyes"; then
             AC_DEFINE(ZMQ_HAVE_TIPC, 1, [Have TIPC support])
@@ -367,8 +376,6 @@ AC_ARG_ENABLE([curve-keygen],
     [zmq_enable_curve_keygen=$enableval],
     [zmq_enable_curve_keygen=yes])
 
-AM_CONDITIONAL(ENABLE_CURVE_KEYGEN, test "x$zmq_enable_curve_keygen" = "xyes")
-
 # Use c++ in subsequent tests
 AC_LANG_PUSH(C++)
 
@@ -441,6 +448,7 @@ elif test "x$with_libsodium" = "xyes"; then
     AC_DEFINE(ZMQ_HAVE_CURVE, [1], [Using curve encryption])
     AC_DEFINE(ZMQ_USE_LIBSODIUM, [1], [Using libsodium for curve encryption])
     curve_library="libsodium"
+    enable_curve="yes"
 
     # On Solaris, libsodium depends on libssp
     case "${host_os}" in
@@ -450,14 +458,18 @@ elif test "x$with_libsodium" = "xyes"; then
             libzmq_werror="no"
         ;;
     esac
+
+    PKGCFG_LIBS_PRIVATE="$PKGCFG_LIBS_PRIVATE $sodium_LIBS"
 else
     AC_MSG_NOTICE([Using tweetnacl for CURVE security])
     AC_DEFINE(ZMQ_HAVE_CURVE, [1], [Using curve encryption])
     AC_DEFINE(ZMQ_USE_TWEETNACL, [1], [Using tweetnacl for curve encryption])
     curve_library="tweetnacl"
+    enable_curve="yes"
 fi
 
-AM_CONDITIONAL(ENABLE_CURVE_KEYGEN, test "x$enable_curve" = "xyes")
+AM_CONDITIONAL(ENABLE_CURVE_KEYGEN, test "x$enable_curve" = "xyes" -a "x$zmq_enable_curve_keygen" = "xyes")
+
 AM_CONDITIONAL(USE_LIBSODIUM, test "$curve_library" = "libsodium")
 AM_CONDITIONAL(USE_TWEETNACL, test "$curve_library" = "tweetnacl")
 
@@ -478,6 +490,7 @@ fi
 
 if test "x$have_pgm_library" = "xyes"; then
     AC_DEFINE(ZMQ_HAVE_OPENPGM, [1], [Have OpenPGM extension])
+    PKGCFG_LIBS_PRIVATE="$PKGCFG_LIBS_PRIVATE $pgm_LIBS"
 fi
 
 AM_CONDITIONAL(HAVE_PGM, test "x$have_pgm_library" = "xyes")
@@ -504,6 +517,7 @@ if test "x$with_norm_ext" != "xno"; then
         LIBZMQ_EXTRA_LDFLAGS="-L${norm_path}/lib ${LIBZMQ_EXTRA_LDFLAGS}"
     fi
     LIBS="-L${norm_path}/lib -lnorm $LIBS"
+    PKGCFG_LIBS_PRIVATE="$PKGCFG_LIBS_PRIVATE -lnorm"
 else
     AC_MSG_RESULT([no])
 fi
@@ -636,6 +650,7 @@ PKG_CHECK_MODULES(LIBUNWIND, [libunwind],
         AC_DEFINE(HAVE_LIBUNWIND, 1, [The libunwind library is to be used])
         AC_SUBST([LIBUNWIND_CFLAGS])
         AC_SUBST([LIBUNWIND_LIBS])
+        AC_CHECK_LIB([dl], [dladdr])
     ],
     [
         AC_MSG_WARN([Cannot find libunwind])
@@ -648,6 +663,8 @@ AC_SUBST(LIBZMQ_EXTRA_LDFLAGS)
 
 AC_SUBST(LIBZMQ_VMCI_CXXFLAGS)
 AC_SUBST(LIBZMQ_VMCI_LDFLAGS)
+
+AC_SUBST(pkg_config_libs_private, $PKGCFG_LIBS_PRIVATE)
 
 # set pkgconfigdir, allow override
 AC_ARG_WITH([pkgconfigdir],
