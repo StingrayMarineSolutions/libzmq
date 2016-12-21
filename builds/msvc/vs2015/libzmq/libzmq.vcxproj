@@ -68,12 +68,18 @@
   </ImportGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseLIB|x64'">
     <Linkage-libsodium />
+    <Option-sodium>
+    </Option-sodium>
+    <Option-tweet>true</Option-tweet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'">
     <Linkage-libsodium />
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugLIB|x64'">
     <Linkage-libsodium />
+    <Option-sodium>
+    </Option-sodium>
+    <Option-tweet>true</Option-tweet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'">
     <Linkage-libsodium />
